@@ -1,0 +1,25 @@
+{
+  "name": "discordbot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "s": "nodemon index",
+    "d": "node deploy-commands & npm run s"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "express": "^4.18.2",
+    "file-system-db": "^2.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "nodemonConfig": {
+      "ignore": [
+          "database/"
+      ]
+  }
+}
