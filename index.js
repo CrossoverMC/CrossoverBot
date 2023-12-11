@@ -15,7 +15,6 @@ const client = new Client({
 
 /* Commands */
 
-client.booths = {}
 client.commands = new Collection()
 
 const foldersPath = path.join(__dirname, "commands")

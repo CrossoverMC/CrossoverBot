@@ -7,15 +7,15 @@ const router = express.Router()
 
 router.use("/", (req, res, next) => { // provide response method
     res.res = (responseCode, a, b) => {
-        if (a == null) {
-            res.sendStatus(responseCode)
-        } else if (b == null) {
+        a ??= toString(responseCode)
+
+        if (b == null) {
             let json
 
-            if (typeof a === "string") {
-                json = { statusMessage: a }
-            } else {
+            if (typeof a === "object") {
                 json = a
+            } else { // assume string
+                json = { statusMessage: a }
             }
 
             res.status(responseCode).json(json)
@@ -91,12 +91,91 @@ router.post("/unlink", async (req, res) => {
     res.res(200, "success", { discordUsername: member.user?.username })
 })
 
-const userTasks = {}
+router.post("/unlink", async (req, res) => {
+    const { body, client, guild } = req
+    const { username: minecraftUsername, uuid } = body
+    const links = jsonDatabase.get(jsonDatabase.LINKS_PATH)
+
+    let discordUserId = null
+
+    for (let userId in links) {
+        const minecraftUuid = links[userId]
+
+        if (minecraftUuid === uuid) {
+            discordUserId = userId
+            break
+        }
+    }
+
+    if (!discordUserId) {
+        res.res(409, "not_linked")
+        return
+    }
+
+    jsonDatabase.delete(jsonDatabase.LINKS_PATH + "." + discordUserId)
+
+    const member = await guild.members.fetch(discordUserId)
+    client.emit("minecraftAccountUnlinked", member)
+    member.send("Your account has been unlinked from the Minecraft account `" + minecraftUsername + "`.").catch()
+    res.res(200, "success", { discordUsername: member.user?.username })
+})
+
+router.put("/update-booths", async (req, res) => {
+    const { body, guild } = req
+    const { booths: boothIds } = body
+
+    let asyncTasks = []
+
+    // delete previous
+    jsonDatabase.delete(jsonDatabase.BOOTH_CHANNELS_PATH)
+
+    guild.channels.cache.forEach(channel => {
+        if (channel.type === ChannelType.GuildVoice && channel.parentId === boothCategoryId && channel.id !== waitingBoothId) {
+            const promise = channel.delete()
+            asyncTasks.push(promise)
+        }
+    })
+
+    try {
+        await Promise.all(asyncTasks)
+    } catch {
+        console.warn("Error deleting booth voice channels")
+        res.res(500)
+        return
+    }
+
+    // create new
+    if (boothIds.length > 0) {
+        const channelIdSaves = {}
+        asyncTasks = []
+
+        for (let boothId of boothIds.split(",")) {
+            const promise = guild.channels.create({
+                name: "Booth",
+                type: ChannelType.GuildVoice,
+                parent: boothCategoryId
+            }).then(channel => channelIdSaves[boothId] = channel.id)
+
+            asyncTasks.push(promise)
+        }
+
+        try {
+            await Promise.all(asyncTasks)
+        } catch {
+            console.warn("Error creating booth voice channels")
+            res.res(500)
+            return
+        }
+
+        jsonDatabase.set(jsonDatabase.BOOTH_CHANNELS_PATH, channelIdSaves)
+    }
+
+    res.res(200, "success")
+})
 
 router.put("/voice-booth", async (req, res) => {
-    const { body, client, guild } = req
+    const { body, guild } = req
     const { booth: boothId, user: minecraftUserUuid } = body
-    const { booths } = client
 
     const links = jsonDatabase.get(jsonDatabase.LINKS_PATH)
     let discordUserId
@@ -123,49 +202,26 @@ router.put("/voice-booth", async (req, res) => {
         return
     }
 
-    let promiseResolve
-    const taskPromise = new Promise(r => promiseResolve = r)
-
-    let userSpecificTasks = userTasks[minecraftUserUuid]
-    if (!userSpecificTasks) userSpecificTasks = userTasks[minecraftUserUuid] = []
-
-    const previousUserTasks = [...userSpecificTasks]
-    userSpecificTasks.push(taskPromise)
-    await Promise.all([...previousUserTasks])
-
-    let voiceChannel
+    let voiceChannelId
 
     if (boothId === "none") {
-        voiceChannel = guild.channels.cache.get(waitingBoothId)
+        voiceChannelId = waitingBoothId
     } else {
-        voiceChannel = booths[boothId]
+        voiceChannelId = jsonDatabase.get(jsonDatabase.BOOTH_CHANNELS_PATH + "." + boothId)
 
-        if (!voiceChannel) {
-            try {
-                voiceChannel = booths[boothId] = await guild.channels.create({
-                    name: "Booth",
-                    type: ChannelType.GuildVoice,
-                    parent: boothCategoryId
-                })
-
-                await new Promise(r => setTimeout(r, 2000))
-            } catch {
-                console.warn("Error creating channel: " + boothId)
-                res.res(500)
-                return
-            }
+        if (!voiceChannelId) {
+            res.res(500)
+            return
         }
     }
 
-    promiseResolve()
-    userSpecificTasks.splice(userSpecificTasks.indexOf(taskPromise), 1)
+    const voiceChannel = guild.channels.cache.get(voiceChannelId)
 
     try {
-        console.log("joining: " + voiceChannel.id)
         await voice.setChannel(voiceChannel)
         res.res(200, "success")
     } catch {
-        console.warn("Error joining channel: " + voiceChannel.id)
+        console.warn("Error joining channel: " + voiceChannelId)
         res.res(500)
     }
 })
