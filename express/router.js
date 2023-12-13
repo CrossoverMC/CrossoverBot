@@ -53,7 +53,7 @@ router.post("/link", async (req, res) => {
 
             const member = await guild.members.fetch(userId)
             client.emit("minecraftAccountLinked", member)
-            member.send("Your account has been linked to the Minecraft account `" + minecraftUsername + "`.").catch()
+            member.send("Your account has been linked to the Minecraft account `" + minecraftUsername + "`.").catch(() => { })
             res.res(200, "success", { discordUsername: member.user?.username })
             return
         }
@@ -87,36 +87,7 @@ router.post("/unlink", async (req, res) => {
 
     const member = await guild.members.fetch(discordUserId)
     client.emit("minecraftAccountUnlinked", member)
-    member.send("Your account has been unlinked from the Minecraft account `" + minecraftUsername + "`.").catch()
-    res.res(200, "success", { discordUsername: member.user?.username })
-})
-
-router.post("/unlink", async (req, res) => {
-    const { body, client, guild } = req
-    const { username: minecraftUsername, uuid } = body
-    const links = jsonDatabase.get(jsonDatabase.LINKS_PATH)
-
-    let discordUserId = null
-
-    for (let userId in links) {
-        const minecraftUuid = links[userId]
-
-        if (minecraftUuid === uuid) {
-            discordUserId = userId
-            break
-        }
-    }
-
-    if (!discordUserId) {
-        res.res(409, "not_linked")
-        return
-    }
-
-    jsonDatabase.delete(jsonDatabase.LINKS_PATH + "." + discordUserId)
-
-    const member = await guild.members.fetch(discordUserId)
-    client.emit("minecraftAccountUnlinked", member)
-    member.send("Your account has been unlinked from the Minecraft account `" + minecraftUsername + "`.").catch()
+    member.send("Your account has been unlinked from the Minecraft account `" + minecraftUsername + "`.").catch(() => { })
     res.res(200, "success", { discordUsername: member.user?.username })
 })
 
