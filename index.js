@@ -60,8 +60,6 @@ for (const file of eventFiles) {
 	}
 }
 
-/* Presence */
-
 client.login(token)
 
 /* Express */

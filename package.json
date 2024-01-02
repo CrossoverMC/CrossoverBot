@@ -4,8 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "s": "nodemon index",
-    "d": "node deploy-commands & npm run s"
+    "s": "node index",
+    "d": "nodemon index",
+    "c": "node deploy-commands & npm run d"
   },
   "author": "",
   "license": "ISC",
