@@ -1,8 +1,8 @@
 const fs = require("fs")
 const path = require("path")
 const express = require("express")
-const expressRouter = require("./express/router")
 const { Client, Collection, GatewayIntentBits } = require("discord.js")
+const expressRouter = require("./express/router")
 const { guildId, token } = require("./config.json")
 
 const client = new Client({
